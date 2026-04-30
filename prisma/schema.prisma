@@ -1,0 +1,113 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ── NextAuth required tables ─────────────────────────────────────────────────
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  accounts       Account[]
+  sessions       Session[]
+  ownedBoards    WhiteboardSession[] @relation("OwnedBoards")
+  participations Participant[]
+  chatMessages   ChatMessage[]
+}
+
+model Account {
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([provider, providerAccountId])
+}
+
+model Session {
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String
+  expires    DateTime
+
+  @@id([identifier, token])
+}
+
+// ── Domain tables ─────────────────────────────────────────────────────────────
+
+model WhiteboardSession {
+  id          String    @id @default(cuid())
+  inviteCode  String    @unique
+  title       String    @default("Untitled Board")
+  ownerId     String
+  canvasState Json?
+  webhookUrl  String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  expiresAt   DateTime?
+
+  owner        User          @relation("OwnedBoards", fields: [ownerId], references: [id], onDelete: Cascade)
+  participants Participant[]
+  messages     ChatMessage[]
+
+  @@index([ownerId])
+  @@index([inviteCode])
+  @@map("whiteboard_sessions")
+}
+
+model Participant {
+  id         String   @id @default(cuid())
+  sessionId  String
+  userId     String
+  joinedAt   DateTime @default(now())
+  lastSeenAt DateTime @default(now())
+
+  session WhiteboardSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  user    User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, userId])
+  @@map("participants")
+}
+
+model ChatMessage {
+  id        String   @id @default(cuid())
+  sessionId String
+  userId    String
+  content   String   @db.Text
+  createdAt DateTime @default(now())
+
+  session WhiteboardSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  user    User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId, createdAt])
+  @@map("chat_messages")
+}
