@@ -65,33 +65,31 @@ jobs:
       - name: Copy compose files to server
         uses: appleboy/scp-action@v0.1.7
         with:
-          host:     ${{ secrets.SSH_HOST }}
+          host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
-          key:      ${{ secrets.SSH_KEY }}
-          port:     ${{ secrets.SSH_PORT }}
-          source:   "docker-compose.yml,nginx/"
-          target:   /opt/whiteboard
+          key: ${{ secrets.SSH_KEY }}
+          port: ${{ secrets.SSH_PORT }}
+          source: "docker-compose.yml,nginx/"
+          target: /opt/whiteboard
 
       - name: Write .env and restart services
         uses: appleboy/ssh-action@v1.0.3
         env:
-          DATABASE_URL:      ${{ secrets.DATABASE_URL }}
-          AUTH_SECRET:       ${{ secrets.AUTH_SECRET }}
-          AUTH_URL:          ${{ secrets.AUTH_URL }}
-          AUTH_GOOGLE_ID:    ${{ secrets.AUTH_GOOGLE_ID }}
-          AUTH_GOOGLE_SECRET:${{ secrets.AUTH_GOOGLE_SECRET }}
-          GEMINI_API_KEY:    ${{ secrets.GEMINI_API_KEY }}
-          GH_TOKEN:          ${{ secrets.GITHUB_TOKEN }}
-          APP_IMAGE:         ${{ needs.build.outputs.image }}:${{ needs.build.outputs.tag }}
-          GH_ACTOR:          ${{ github.actor }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          AUTH_SECRET: ${{ secrets.AUTH_SECRET }}
+          AUTH_URL: ${{ secrets.AUTH_URL }}
+          AUTH_GOOGLE_ID: ${{ secrets.AUTH_GOOGLE_ID }}
+          AUTH_GOOGLE_SECRET: ${{ secrets.AUTH_GOOGLE_SECRET }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          APP_IMAGE: ${{ needs.build.outputs.image }}:${{ needs.build.outputs.tag }}
+          GH_ACTOR: ${{ github.actor }}
         with:
-          host:     ${{ secrets.SSH_HOST }}
+          host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
-          key:      ${{ secrets.SSH_KEY }}
-          port:     ${{ secrets.SSH_PORT }}
-          envs: >-
-            DATABASE_URL,AUTH_SECRET,AUTH_URL,AUTH_GOOGLE_ID,
-            AUTH_GOOGLE_SECRET,GEMINI_API_KEY,GH_TOKEN,APP_IMAGE,GH_ACTOR
+          key: ${{ secrets.SSH_KEY }}
+          port: ${{ secrets.SSH_PORT }}
+          envs: DATABASE_URL,AUTH_SECRET,AUTH_URL,AUTH_GOOGLE_ID,AUTH_GOOGLE_SECRET,GEMINI_API_KEY,GH_TOKEN,APP_IMAGE,GH_ACTOR
           script: |
             set -e
             cd /opt/whiteboard
