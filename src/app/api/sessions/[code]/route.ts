@@ -21,8 +21,9 @@ export async function GET(_req: NextRequest, { params }: { params: { code: strin
 
   if (!board) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  const isOwner = board.ownerId === session.user.id;
-  const isParticipant = board.participants.some((p) => p.userId === session.user.id);
+  const userId = session.user.id;
+  const isOwner = board.ownerId === userId;
+  const isParticipant = board.participants.some((p) => p.userId === userId);
   if (!isOwner && !isParticipant) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   return NextResponse.json({
