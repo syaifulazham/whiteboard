@@ -4,3 +4,9 @@
 
 html, body, #__next { height: 100%; margin: 0; }
 body { background: #0b0d12; color: #e5e7eb; font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+
+/* Move tldraw toolbar from bottom to top */
+.tlui-toolbar {
+  top: 8px !important;
+  bottom: auto !important;
+}
