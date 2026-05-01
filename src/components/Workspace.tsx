@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Tldraw, Editor, TLShapeId, TLComponents, DefaultStylePanelContent, useRelevantStyles } from "tldraw";
+import { Tldraw, Editor, TLShapeId, TLComponents, DefaultStylePanelContent, DefaultToolbarContent, useRelevantStyles } from "tldraw";
 import { Palette } from "lucide-react";
 import ActionCardManager from "./ActionCardManager";
 import BoardHeader from "./BoardHeader";
@@ -210,8 +210,9 @@ export default function Workspace({ sessionId, inviteCode, initialSnapshot, isOw
   }, []);
 
   const tlComponents: TLComponents = {
-    StylePanel: null,                        // suppress the default floating panel
-    InFrontOfTheCanvas: StylePanelWithToggle, // our positioned replacement
+    StylePanel: null,
+    Toolbar: TopToolbar,
+    InFrontOfTheCanvas: StylePanelWithToggle,
   };
 
   const insertImage = useCallback(async (dataUrl: string, w = 480, h = 360) => {
@@ -297,6 +298,33 @@ function extractRichText(node: any): string {
   if (typeof node.text === "string") return node.text;
   if (Array.isArray(node.content)) return node.content.map(extractRichText).join(node.type === "paragraph" ? "\n" : "");
   return "";
+}
+
+// Toolbar rendered at top-center via the Toolbar slot.
+// Module-level for stable reference.
+function TopToolbar() {
+  return (
+    <div
+      style={{
+        position: "absolute",
+        top: 8,
+        left: "50%",
+        transform: "translateX(-50%)",
+        zIndex: 300,
+        pointerEvents: "auto",
+        display: "flex",
+        alignItems: "center",
+        background: "white",
+        borderRadius: 8,
+        boxShadow: "0 2px 8px rgba(0,0,0,0.12), 0 0 0 1px rgba(0,0,0,0.06)",
+        padding: "0 4px",
+        height: 44,
+      }}
+      onPointerDown={(e) => e.stopPropagation()}
+    >
+      <DefaultToolbarContent />
+    </div>
+  );
 }
 
 // Rendered via InFrontOfTheCanvas so tldraw hooks (useRelevantStyles) work.
