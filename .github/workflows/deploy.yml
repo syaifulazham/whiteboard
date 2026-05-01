@@ -1,0 +1,121 @@
+name: Build & Deploy
+
+on:
+  push:
+    branches: [main]
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  # ── Job 1: Build Docker image and push to GHCR ────────────────────────────
+  build:
+    name: Build & Push Image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image: ${{ steps.vars.outputs.image }}
+      tag:   ${{ steps.vars.outputs.tag }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Resolve image name and tag
+        id: vars
+        run: |
+          IMAGE="${REGISTRY}/${GITHUB_REPOSITORY,,}"
+          TAG="sha-${GITHUB_SHA::7}"
+          echo "image=${IMAGE}" >> "$GITHUB_OUTPUT"
+          echo "tag=${TAG}"     >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ steps.vars.outputs.image }}:${{ steps.vars.outputs.tag }}
+            ${{ steps.vars.outputs.image }}:latest
+          cache-from: type=gha
+          cache-to:   type=gha,mode=max
+
+  # ── Job 2: Deploy to server via SSH ───────────────────────────────────────
+  deploy:
+    name: Deploy
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Copy compose files to server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host:     ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key:      ${{ secrets.SSH_KEY }}
+          port:     ${{ secrets.SSH_PORT }}
+          source:   "docker-compose.yml,nginx/"
+          target:   /opt/whiteboard
+
+      - name: Write .env and restart services
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          DATABASE_URL:      ${{ secrets.DATABASE_URL }}
+          AUTH_SECRET:       ${{ secrets.AUTH_SECRET }}
+          AUTH_URL:          ${{ secrets.AUTH_URL }}
+          AUTH_GOOGLE_ID:    ${{ secrets.AUTH_GOOGLE_ID }}
+          AUTH_GOOGLE_SECRET:${{ secrets.AUTH_GOOGLE_SECRET }}
+          GEMINI_API_KEY:    ${{ secrets.GEMINI_API_KEY }}
+          GH_TOKEN:          ${{ secrets.GITHUB_TOKEN }}
+          APP_IMAGE:         ${{ needs.build.outputs.image }}:${{ needs.build.outputs.tag }}
+          GH_ACTOR:          ${{ github.actor }}
+        with:
+          host:     ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key:      ${{ secrets.SSH_KEY }}
+          port:     ${{ secrets.SSH_PORT }}
+          envs: >-
+            DATABASE_URL,AUTH_SECRET,AUTH_URL,AUTH_GOOGLE_ID,
+            AUTH_GOOGLE_SECRET,GEMINI_API_KEY,GH_TOKEN,APP_IMAGE,GH_ACTOR
+          script: |
+            set -e
+            cd /opt/whiteboard
+
+            # Write .env from CI secrets
+            # Using printf '%s\n' prevents % in values from being interpreted
+            {
+              printf 'DATABASE_URL=%s\n'       "${DATABASE_URL}"
+              printf 'AUTH_SECRET=%s\n'        "${AUTH_SECRET}"
+              printf 'AUTH_URL=%s\n'           "${AUTH_URL}"
+              printf 'AUTH_GOOGLE_ID=%s\n'     "${AUTH_GOOGLE_ID}"
+              printf 'AUTH_GOOGLE_SECRET=%s\n' "${AUTH_GOOGLE_SECRET}"
+              printf 'GEMINI_API_KEY=%s\n'     "${GEMINI_API_KEY}"
+              printf 'APP_IMAGE=%s\n'          "${APP_IMAGE}"
+            } > .env
+
+            # Pull new image from GHCR
+            echo "${GH_TOKEN}" | docker login ghcr.io -u "${GH_ACTOR}" --password-stdin
+            docker compose pull app
+
+            # Start / restart (no-downtime rolling via depends_on health check)
+            docker compose up -d --remove-orphans
+
+            # Prune dangling images to free disk
+            docker image prune -f
+
+            echo "Deployed ${APP_IMAGE}"
