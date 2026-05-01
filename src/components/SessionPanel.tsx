@@ -235,7 +235,7 @@ export default function SessionPanel({ open, onClose, inviteCode, isOwner, curre
                             )}
                           </span>
                           {p.isOwner && (
-                            <Crown size={12} className="text-amber-400 shrink-0" title="Owner" />
+                            <Crown size={12} className="text-amber-400 shrink-0" aria-label="Owner" />
                           )}
                         </li>
                       ))}
