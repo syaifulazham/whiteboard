@@ -5,10 +5,9 @@ services:
     env_file: .env
     expose:
       - "3000"
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     networks:
       - internal
+      - smarttutor_default
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/health"]
       interval: 30s
@@ -32,3 +31,5 @@ services:
 networks:
   internal:
     driver: bridge
+  smarttutor_default:
+    external: true
