@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { askGemini, AssistantMessage } from "@/lib/gemini";
+import { askEptim, AssistantMessage } from "@/lib/eptim";
 
 export const runtime = "nodejs";
 
@@ -8,7 +8,6 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const messages: AssistantMessage[] = body.messages ?? [];
     const canvasContext: string | undefined = body.canvasContext;
-    const imageBase64: string | undefined = body.imageBase64;
 
     const contextPrefix = canvasContext
       ? `Current board context (recognized text / shape summary):\n${canvasContext}\n\n`
@@ -18,7 +17,7 @@ export async function POST(req: NextRequest) {
       messages[messages.length - 1] = { ...last, text: contextPrefix + last.text };
     }
 
-    const text = await askGemini({ messages, imageBase64, imageMime: "image/png" });
+    const text = await askEptim({ messages });
     return NextResponse.json({ text });
   } catch (e: any) {
     return NextResponse.json({ error: e?.message ?? "error" }, { status: 500 });

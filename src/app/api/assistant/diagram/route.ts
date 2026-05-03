@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { askGemini } from "@/lib/gemini";
+import { askEptim } from "@/lib/eptim";
 
 export const runtime = "nodejs";
 
@@ -10,7 +10,7 @@ Pick the best Mermaid diagram type for the request (flowchart, sequenceDiagram, 
 export async function POST(req: NextRequest) {
   try {
     const { description } = await req.json();
-    const text = await askGemini({
+    const text = await askEptim({
       system: SYSTEM,
       messages: [{ role: "user", text: `Create a Mermaid diagram for: ${description}` }],
     });

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { askGemini } from "@/lib/gemini";
+import { genai, VISION_MODEL } from "@/lib/gemini";
 
 export const runtime = "nodejs";
 
@@ -11,13 +11,20 @@ export async function POST(req: NextRequest) {
   try {
     const { imageBase64, mime } = await req.json();
     if (!imageBase64) return NextResponse.json({ error: "imageBase64 required" }, { status: 400 });
-    const text = await askGemini({
-      system: SYSTEM,
-      messages: [{ role: "user", text: "Transcribe the handwriting in this image." }],
-      imageBase64,
-      imageMime: mime ?? "image/png",
+
+    const res = await genai.models.generateContent({
+      model: VISION_MODEL,
+      contents: [{
+        role: "user",
+        parts: [
+          { text: "Transcribe the handwriting in this image." },
+          { inlineData: { data: imageBase64, mimeType: mime ?? "image/png" } },
+        ],
+      }],
+      config: { systemInstruction: SYSTEM },
     });
-    return NextResponse.json({ text: text.trim() });
+
+    return NextResponse.json({ text: (res.text ?? "").trim() });
   } catch (e: any) {
     return NextResponse.json({ error: e?.message ?? "error" }, { status: 500 });
   }

@@ -14,6 +14,7 @@ import {
 import { toPng } from "html-to-image";
 import MathView, { RichText } from "./MathView";
 import MermaidView from "./MermaidView";
+import MarkdownResultView from "./MarkdownResultView";
 
 type SuggestionMode =
   | "explain"
@@ -21,6 +22,7 @@ type SuggestionMode =
   | "translate"
   | "summarize"
   | "diagram"
+  | "chart"
   | "hwr"
   | "refine"
   | "describe"
@@ -137,17 +139,26 @@ export default function SelectionActionCard(props: SelectionActionCardProps) {
 
   async function insertTextResult(data: string, nodeRef: React.RefObject<HTMLDivElement> = richResultRef) {
     const hasLatex = /\$/.test(data) || /\\\[/.test(data) || /\\\(/.test(data);
-    if (hasLatex && nodeRef.current) {
+    const hasMarkdown = /^#{1,3}\s|\*\*|^\s*[-*]\s|^\||^---+$|^```/m.test(data);
+    if ((hasLatex || hasMarkdown) && nodeRef.current) {
       try {
-        await new Promise((r) => setTimeout(r, 50));
+        await new Promise((r) => setTimeout(r, 80));
         const node = nodeRef.current;
         const rect = node.getBoundingClientRect();
-        const dataUrl = await toPng(node, { pixelRatio: 2, cacheBust: true });
+        const dataUrl = await toPng(node, { pixelRatio: 2, cacheBust: true, backgroundColor: "#ffffff" });
         await props.insertImage(dataUrl, Math.max(200, rect.width), Math.max(40, rect.height));
         return;
       } catch {}
     }
-    props.insertTextNote(data);
+    // Plain text fallback — strip any residual markdown markers
+    props.insertTextNote(
+      data
+        .replace(/^#{1,3}\s+/gm, "")
+        .replace(/\*\*(.+?)\*\*/g, "$1")
+        .replace(/\*(.+?)\*/g, "$1")
+        .replace(/^---+$/gm, "")
+        .trim(),
+    );
   }
 
   function onResizeStart(e: React.MouseEvent, dir: "e" | "s" | "se") {
@@ -241,13 +252,27 @@ export default function SelectionActionCard(props: SelectionActionCardProps) {
     setError(null);
     setResult(null);
     try {
+      // Build context: shape text → OCR the image → classification description
+      let context = snapshot.text;
+      if (!context) {
+        try {
+          const ocrRes = await fetch("/api/assistant/hwr", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ imageBase64: snapshot.base64, mime: snapshot.mime }),
+          });
+          const ocrData = await ocrRes.json();
+          if (ocrData.text) context = ocrData.text;
+        } catch {}
+      }
+      if (!context && classification?.description) context = classification.description;
+
       const r = await fetch("/api/assistant/ask", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           messages: [{ role: "user", text: prompt }],
-          canvasContext: snapshot.text || undefined,
-          imageBase64: snapshot.base64,
+          canvasContext: context || undefined,
         }),
       });
       const d = await r.json();
@@ -269,7 +294,9 @@ export default function SelectionActionCard(props: SelectionActionCardProps) {
         ? { base64: snapshot.base64, mime: snapshot.mime }
         : await props.getSelectionImage(initialShapeIds);
       if (!img) throw new Error("No captured selection");
-      const text = snapshot ? snapshot.text : props.getSelectionText(initialShapeIds);
+      const rawText = snapshot ? snapshot.text : props.getSelectionText(initialShapeIds);
+      // Fall back to classification description when shape text is empty (e.g. image shapes)
+      const text = rawText || (classification?.description ? `[${classification.description}]` : "");
 
       switch (s.mode) {
         case "math": {
@@ -337,6 +364,17 @@ export default function SelectionActionCard(props: SelectionActionCardProps) {
           setResult({ kind: "mermaid", data: d.mermaid ?? "" });
           break;
         }
+        case "chart": {
+          const r = await fetch("/api/assistant/chart", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ imageBase64: img.base64, mime: img.mime, instruction: s.instruction || "" }),
+          });
+          const d = await r.json();
+          if (d.error) throw new Error(d.error);
+          setResult({ kind: "mermaid", data: d.mermaid ?? "" });
+          break;
+        }
         case "hwr": {
           const r = await fetch("/api/assistant/hwr", {
             method: "POST",
@@ -364,7 +402,6 @@ export default function SelectionActionCard(props: SelectionActionCardProps) {
             body: JSON.stringify({
               messages: [{ role: "user", text: userPrompt }],
               canvasContext: text || undefined,
-              imageBase64: img.base64,
             }),
           });
           const d = await r.json();
@@ -567,7 +604,12 @@ export default function SelectionActionCard(props: SelectionActionCardProps) {
                   <div className="text-[10px] uppercase tracking-wider text-neutral-500">{result.title}</div>
                 )}
                 <div ref={richResultRef} className="rounded-md border border-yellow-200 bg-white p-3">
-                  <RichText text={result.data} className="text-[13px] leading-6 text-neutral-700" />
+                  <MarkdownResultView
+                    text={result.data}
+                    onInsertMermaid={(svg) =>
+                      props.insertImage("data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg))
+                    }
+                  />
                 </div>
                 <div className="flex justify-end">
                   <button

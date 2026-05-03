@@ -19,13 +19,13 @@ Given an image of the selection (and optional recognized text), output JSON:
     "unknown"
 - "description": <= 80 chars of what is shown.
 - "suggestions": 2-5 actions. Each has { "label" (<=24 chars, imperative), "mode", "instruction" (optional), "target" (optional, for translate) }.
-    "mode" is one of: "explain", "math", "translate", "summarize", "diagram", "hwr", "chat", "refine".
+    "mode" is one of: "explain", "math", "translate", "summarize", "diagram", "chart", "hwr", "chat", "refine".
     Choose suggestions appropriate to the detected type, e.g.:
       math     -> [Solve for x / Factor / Simplify / Differentiate / Integrate / Explain]
       chemistry-> [Balance equation / Predict products / Name compound / Explain]
       text     -> [Summarize / Translate to English / Explain / Refine wording]
-      graph    -> [Identify function / Explain / Extract data points]
-      shape    -> [Describe / Convert to clean diagram / Explain]
+      graph    -> [Plot clean chart / Identify function / Explain / Extract data points]  <- use mode "chart" for "Plot clean chart"
+      shape    -> [Convert to diagram / Describe / Explain]  <- use mode "chart" for "Convert to diagram"
       image    -> [Describe / Extract text / Identify objects]
       science_symbol -> [Explain / Convert to LaTeX]
       unknown / mixed -> [Describe / Explain]
@@ -75,7 +75,7 @@ export async function POST(req: NextRequest) {
                   label: { type: Type.STRING },
                   mode: {
                     type: Type.STRING,
-                    enum: ["explain", "math", "translate", "summarize", "diagram", "hwr", "chat", "refine"],
+                    enum: ["explain", "math", "translate", "summarize", "diagram", "chart", "hwr", "chat", "refine"],
                   },
                   instruction: { type: Type.STRING },
                   target: { type: Type.STRING },
